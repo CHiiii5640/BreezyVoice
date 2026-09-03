@@ -14,3 +14,13 @@ data/style_bank/{neutral,happy,sad,excited,gentle,serious,surprised}/{1,2,3}.txt
 The API returns HTTP 422 for an unknown style, invalid intensity, missing WAV,
 missing transcript, or blank transcript. Valid references are loaded at startup
 and cached for the process lifetime.
+
+Before loading the model, run:
+
+```sh
+python scripts/preflight_style_bank.py data/style_bank
+```
+
+It emits JSON with all 21 expected entries, decoded WAV format/duration, and
+every missing or invalid item. It cannot prove speaker authorization; maintain
+that authorization separately.

@@ -102,7 +102,16 @@ async def speach_endpoint(request: Request, payload: SpeechRequest):
         prompt.prompt_speech_16k,
     )
     audio_buffer = BytesIO()
-    torchaudio.save(audio_buffer, output["tts_speech"], 22050, format="wav")
+    # Modified by CHiiii5640 (2026): keep the API contract deterministic for
+    # segment composition: 22.05 kHz mono PCM WAV, not torchaudio's Float32 default.
+    torchaudio.save(
+        audio_buffer,
+        output["tts_speech"],
+        22050,
+        format="wav",
+        encoding="PCM_S",
+        bits_per_sample=16,
+    )
     audio_buffer.seek(0)
     return StreamingResponse(
         audio_buffer,
