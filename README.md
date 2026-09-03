@@ -1,5 +1,10 @@
 # BreezyVoice
 
+> Fork note (CHiiii5640, 2026): `api.py` is modified to add an authorized
+> style bank (`style` plus `intensity` 1–3) to `POST /v1/audio/speech`; see
+> `data/style_bank/README.md`. This fork retains the upstream Apache-2.0
+> license, original copyright notices, and BreezyVoice inference runtime.
+
 BreezyVoice is a voice-cloning text-to-speech system specifically adapted for Taiwanese Mandarin, highlighting phonetic control abilities via auxiliary 注音 (bopomofo) inputs. BreezyVoice is partially derived from [CosyVoice](https://github.com/FunAudioLLM/CosyVoice). BreezyVoice is part of the [Breeze2 family](https://huggingface.co/collections/MediaTek-Research/breeze2-family-67863158443a06a72dd29900)
 
 <img src="https://raw.githubusercontent.com/mtkresearch/BreezyVoice/main/images/flowchart.png" alt="flowchart" width="700"/>

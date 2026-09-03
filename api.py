@@ -1,10 +1,11 @@
 # OpenAI API Spec. Reference: https://platform.openai.com/docs/api-reference/audio/createSpeech
+# Modified by CHiiii5640 (2026): authorized style-bank selection and prompt caching.
 
 from contextlib import asynccontextmanager
 from io import BytesIO
 
 import torchaudio
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from g2pw import G2PWConverter
 from pydantic import BaseModel, Field
@@ -12,6 +13,7 @@ from pydantic_settings import BaseSettings
 
 from cosyvoice.utils.file_utils import load_wav
 from single_inference import CustomCosyVoice, get_bopomofo_rare
+from style_registry import StyleBankError, StyleRegistry
 
 
 class Settings(BaseSettings):
@@ -23,24 +25,23 @@ class Settings(BaseSettings):
         default="MediaTek-Research/BreezyVoice",
         description="Specifies the model used for speech synthesis.",
     )
-    speaker_prompt_audio_path: str = Field(
-        default="./data/example.wav",
-        description="Specifies the path to the prompt speech audio file of the speaker.",
-    )
-    speaker_prompt_text_transcription: str = Field(
-        default="在密碼學中，加密是將明文資訊改變為難以讀取的密文內容，使之不可讀的方法。只有擁有解密方法的對象，經由解密過程，才能將密文還原為正常可讀的內容。",
-        description="Specifies the transcription of the speaker prompt audio.",
+    style_bank_root: str = Field(
+        default="./data/style_bank",
+        description="Root of authorized references: {style}/{intensity}.wav and .txt.",
     )
 
 
 class SpeechRequest(BaseModel):
     model: str = ""
+    voice: str = ""
     input: str = Field(
         description="The content that will be synthesized into speech. You can include phonetic symbols if needed, though they should be used sparingly.",
         examples=["今天天氣真好"],
     )
     response_format: str = ""
     speed: float = 1.0
+    style: str = "neutral"
+    intensity: int = Field(default=2, ge=1, le=3)
 
 
 @asynccontextmanager
@@ -48,9 +49,8 @@ async def lifespan(app: FastAPI):
     app.state.settings = Settings()
     app.state.cosyvoice = CustomCosyVoice(app.state.settings.model_path)
     app.state.bopomofo_converter = G2PWConverter()
-    app.state.prompt_speech_16k = load_wav(
-        app.state.settings.speaker_prompt_audio_path, 16000
-    )
+    app.state.style_registry = StyleRegistry(app.state.settings.style_bank_root, load_wav)
+    app.state.style_registry.preload()
     yield
     del app.state.cosyvoice
     del app.state.bopomofo_converter
@@ -77,9 +77,13 @@ async def get_models(request: Request):
 @app.post("/audio/speech")
 async def speach_endpoint(request: Request, payload: SpeechRequest):
     # normalization
+    try:
+        prompt = request.app.state.style_registry.resolve(payload.style, payload.intensity)
+    except StyleBankError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     speaker_prompt_text_transcription = (
         request.app.state.cosyvoice.frontend.text_normalize_new(
-            request.app.state.settings.speaker_prompt_text_transcription, split=False
+            prompt.transcript, split=False
         )
     )
     content_to_synthesize = request.app.state.cosyvoice.frontend.text_normalize_new(
@@ -95,7 +99,7 @@ async def speach_endpoint(request: Request, payload: SpeechRequest):
     output = request.app.state.cosyvoice.inference_zero_shot_no_normalize(
         content_to_synthesize_bopomo,
         speaker_prompt_text_transcription_bopomo,
-        request.app.state.prompt_speech_16k,
+        prompt.prompt_speech_16k,
     )
     audio_buffer = BytesIO()
     torchaudio.save(audio_buffer, output["tts_speech"], 22050, format="wav")
@@ -103,7 +107,11 @@ async def speach_endpoint(request: Request, payload: SpeechRequest):
     return StreamingResponse(
         audio_buffer,
         media_type="audio/wav",
-        headers={"Content-Disposition": "attachment; filename=output.wav"},
+        headers={
+            "Content-Disposition": "attachment; filename=output.wav",
+            "X-BreezyVoice-Style": prompt.style,
+            "X-BreezyVoice-Intensity": str(prompt.intensity),
+        },
     )
 
 
