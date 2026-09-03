@@ -40,8 +40,12 @@ class StyleRegistry:
     def preload(self) -> None:
         for style in STYLES:
             for intensity in INTENSITIES:
-                if self._paths(style, intensity)[0].is_file() and self._paths(style, intensity)[1].is_file():
+                try:
                     self._cache[(style, intensity)] = self._read(style, intensity)
+                except StyleBankError:
+                    # Invalid or incomplete references must produce request-time
+                    # HTTP 422, never make every other authorized style unusable.
+                    continue
 
     def resolve(self, style: str, intensity: int) -> PromptReference:
         if style not in STYLES:

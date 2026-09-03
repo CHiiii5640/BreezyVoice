@@ -56,10 +56,10 @@ async def lifespan(app: FastAPI):
     del app.state.bopomofo_converter
 
 
-app = FastAPI(lifespan=lifespan, root_path="/v1")
+app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/models")
+@app.get("/v1/models")
 async def get_models(request: Request):
     return {
         "object": "list",
@@ -74,7 +74,7 @@ async def get_models(request: Request):
     }
 
 
-@app.post("/audio/speech")
+@app.post("/v1/audio/speech")
 async def speach_endpoint(request: Request, payload: SpeechRequest):
     # normalization
     try:

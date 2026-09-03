@@ -19,7 +19,8 @@ class CosyVoiceModel:
                  llm: torch.nn.Module,
                  flow: torch.nn.Module,
                  hift: torch.nn.Module):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Modified by CHiiii5640 (2026): use Apple MPS when it is available.
+        self.device = torch.device('cuda' if torch.cuda.is_available() else ('mps' if torch.backends.mps.is_available() else 'cpu'))
         self.llm = llm
         self.flow = flow
         self.hift = hift

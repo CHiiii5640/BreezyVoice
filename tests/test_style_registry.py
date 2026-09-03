@@ -34,6 +34,16 @@ def test_preload_initializes_each_available_reference_once(tmp_path: Path) -> No
     assert registry.resolve("sad", 3).transcript == "難過逐字稿"
 
 
+def test_preload_skips_invalid_reference_but_keeps_the_api_servable(tmp_path: Path) -> None:
+    reference(tmp_path, "neutral", 2, "正常逐字稿")
+    reference(tmp_path, "happy", 1, "")
+    registry = StyleRegistry(tmp_path, lambda path, rate: path)
+    registry.preload()
+    assert registry.resolve("neutral", 2).transcript == "正常逐字稿"
+    with pytest.raises(StyleBankError, match="empty"):
+        registry.resolve("happy", 1)
+
+
 @pytest.mark.parametrize("style", ["neutral", "happy", "sad", "excited", "gentle", "serious", "surprised"])
 @pytest.mark.parametrize("intensity", [1, 2, 3])
 def test_all_legal_style_intensity_pairs(tmp_path: Path, style: str, intensity: int) -> None:

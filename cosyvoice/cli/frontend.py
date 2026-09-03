@@ -27,8 +27,23 @@ try:
     use_ttsfrd = True
 except ImportError:
     print("failed to import ttsfrd, use WeTextProcessing instead")
-    from tn.chinese.normalizer import Normalizer as ZhNormalizer
-    from tn.english.normalizer import Normalizer as EnNormalizer
+    try:
+        from tn.chinese.normalizer import Normalizer as ZhNormalizer
+        from tn.english.normalizer import Normalizer as EnNormalizer
+    except ImportError:
+        # Modified by CHiiii5640 (2026): Homebrew OpenFst can be incompatible
+        # with legacy Pynini. Keep verified plain text rather than failing API
+        # startup; this fallback is not appropriate for complex normalisation.
+        print("WeTextProcessing unavailable; using plain-text normalization")
+
+        class _PlainTextNormalizer:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def normalize(self, text):
+                return text
+
+        ZhNormalizer = EnNormalizer = _PlainTextNormalizer
     use_ttsfrd = False
 from cosyvoice.utils.frontend_utils import contains_chinese, replace_blank, replace_corner_mark, remove_bracket, spell_out_number, split_paragraph
 
@@ -46,7 +61,8 @@ class CosyVoiceFrontEnd:
                  allowed_special: str = 'all'):
         self.tokenizer = get_tokenizer()
         self.feat_extractor = feat_extractor
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Modified by CHiiii5640 (2026): use Apple MPS when it is available.
+        self.device = torch.device('cuda' if torch.cuda.is_available() else ('mps' if torch.backends.mps.is_available() else 'cpu'))
         option = onnxruntime.SessionOptions()
         option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         option.intra_op_num_threads = 1
